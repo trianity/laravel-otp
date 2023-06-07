@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Trianity\Otp;
 
 use Illuminate\Support\Carbon;
@@ -10,52 +12,38 @@ class OtpGenerator
 {
     /**
      * Length of the generated OTP
-     *
-     * @var int
      */
-    protected $length;
+    protected int $length;
 
     /**
      * Generated OPT type
-     *
-     * @var bool
      */
-    protected $onlyDigits;
+    protected bool $onlyDigits;
 
     /**
      * use same token to resending opt
-     *
-     *  @var bool
      */
-    protected $useSameToken;
+    protected bool $useSameToken;
 
     /**
      * Otp Validity time
-     *
-     * @var int
      */
-    protected $validity;
+    protected int $validity;
 
     /**
      * Delete old otps
-     *
-     * @var int
      */
-    protected $deleteOldOtps;
+    protected int $deleteOldOtps;
 
     /**
      * Maximum otps allowed to generate
-     *
-     *  @var int
      */
-    protected $maximumOtpsAllowed;
+    protected int $maximumOtpsAllowed;
 
     /**
      * Maximum number of times to allowed to validate
-     *
-     * @var int
      */
-    protected $allowedAttempts;
+    protected int $allowedAttempts;
 
     public function __construct()
     {
@@ -73,20 +61,19 @@ class OtpGenerator
      * matching property to the value passed to the method and return a chainable
      * object to the caller.
      *
-     * @param  mixed  $params
-     * @return mixed
+     * @param  array<int, string>  $params
      */
-    public function __call(string $method, $params)
+    public function __call(string $method, array $params): ?object
     {
-        if (substr($method, 0, 3) != 'set') {
-            return;
+        if (! Str::of(substr($method, 0, 3))->exactly('set')) {
+            return null;
         }
 
         $property = Str::camel(substr($method, 3));
 
         // Does the property exist on this object?
         if (! property_exists($this, $property)) {
-            return;
+            return null;
         }
 
         $this->{$property} = $params[0] ?? null;
@@ -100,43 +87,31 @@ class OtpGenerator
 
         $otp = OtpModel::where('identifier', $identifier)->first();
 
-        if ($otp == null) {
+        if (! $otp instanceof OtpModel) {
             $otp = OtpModel::create([
                 'identifier' => $identifier,
                 'token' => $this->createPin(),
                 'validity' => $this->validity,
                 'generated_at' => Carbon::now(),
             ]);
-        } else {
-            if ($otp->no_times_generated == $this->maximumOtpsAllowed) {
-                return (object) [
-                    'status' => false,
-                    'message' => 'Reached the maximum times to generate OTP',
-                ];
-            }
 
-            $otp->update([
-                'identifier' => $identifier,
-                'token' => $this->useSameToken ? $otp->token : $this->createPin(),
-                'validity' => $this->validity,
-                'generated_at' => Carbon::now(),
-            ]);
+            $otp->increment('no_times_generated');
+
+            return (object) [
+                'status' => true,
+                'token' => $otp->token,
+                'message' => 'OTP generated',
+            ];
         }
 
-        $otp->increment('no_times_generated');
-
-        return (object) [
-            'status' => true,
-            'token' => $otp->token,
-            'message' => 'OTP generated',
-        ];
+        return $this->updateOtp($otp, $identifier);
     }
 
     public function validate(string $identifier, string $token): object
     {
         $otp = OtpModel::where('identifier', $identifier)->first();
 
-        if (! $otp) {
+        if (! $otp instanceof OtpModel) {
             return (object) [
                 'status' => false,
                 'message' => 'OTP does not exists, Please generate new OTP',
@@ -150,7 +125,7 @@ class OtpGenerator
             ];
         }
 
-        if ($otp->no_times_attempted == $this->allowedAttempts) {
+        if ($otp->no_times_attempted === $this->allowedAttempts) {
             return (object) [
                 'status' => false,
                 'message' => 'Reached the maximum allowed attempts',
@@ -159,7 +134,7 @@ class OtpGenerator
 
         $otp->increment('no_times_attempted');
 
-        if ($otp->token == $token) {
+        if (Str::of($otp->token)->exactly($token)) {
             return (object) [
                 'status' => true,
                 'message' => 'OTP is valid',
@@ -189,7 +164,32 @@ class OtpGenerator
         ];
     }
 
-    private function deleteOldOtps()
+    protected function updateOtp(OtpModel $otp, string $identifier): object
+    {
+        if ($otp->no_times_generated === $this->maximumOtpsAllowed) {
+            return (object) [
+                'status' => false,
+                'message' => 'Reached the maximum times to generate OTP',
+            ];
+        }
+
+        $otp->update([
+            'identifier' => $identifier,
+            'token' => $this->useSameToken ? $otp->token : $this->createPin(),
+            'validity' => $this->validity,
+            'generated_at' => Carbon::now(),
+        ]);
+
+        $otp->increment('no_times_generated');
+
+        return (object) [
+            'status' => true,
+            'token' => $otp->token,
+            'message' => 'OTP generated',
+        ];
+    }
+
+    private function deleteOldOtps(): void
     {
         OtpModel::where('expired', true)
             ->orWhere('created_at', '<', Carbon::now()->subMinutes($this->deleteOldOtps))

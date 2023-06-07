@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Trianity\Otp\Providers;
 
-use Illuminate\Contracts\Container\Container;
 use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
 use Trianity\Otp\OtpGenerator;
@@ -48,7 +47,7 @@ class PackageServiceProvider extends ServiceProvider
     }
 
     /**
-     * @return array
+     * @return array<int, string>
      */
     public function provides(): array
     {

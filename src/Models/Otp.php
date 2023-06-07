@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Trianity\Otp\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -37,9 +39,10 @@ class Otp extends Model
 
         $generatedTime = $this->generated_at->addMinutes($this->validity);
 
-        if (strtotime($generatedTime) >= strtotime(Carbon::now()->toDateTimeString())) {
+        if (strtotime(strval($generatedTime)) >= strtotime(Carbon::now()->toDateTimeString())) {
             return false;
         }
+
         $this->expired = true;
         $this->save();
 
