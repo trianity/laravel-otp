@@ -23,7 +23,7 @@
     "nunomaduro/larastan": "^2.0",
     "nunomaduro/phpinsights": "^2.6",
     "orchestra/testbench": "^7.0|^8.0",
-    "pestphp/pest": "^2.0"
+    "pestphp/pest": "^2.6"
   },
   "autoload": {
     "psr-4": {
@@ -37,11 +37,12 @@
   },
   "extra": {
     "laravel": {
-      "aliases": {
-      },
       "providers": [
         "Trianity\\Otp\\Providers\\PackageServiceProvider"
-      ]
+      ],
+      "aliases": {
+        "Otp": "Trianity\\Otp\\Facades\\Otp"
+      }
     }
   },
   "prefer-stable": true,

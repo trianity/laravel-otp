@@ -25,6 +25,13 @@ class PackageTestCase extends TestCase
 
     protected function getEnvironmentSetUp($app)
     {
-        // perform environment setup
+        $app['config']->set('database.default', 'sqlite');
+        $app['config']->set('database.connections.sqlite', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+
+        include_once dirname(__FILE__, 2).'/database/migrations/2023_06_01_000001_create_otps_table.php';
     }
 }

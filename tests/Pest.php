@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 use Trianity\Otp\Tests\PackageTestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(PackageTestCase::class)->in(__DIR__);
+uses(PackageTestCase::class, RefreshDatabase::class)->in(__DIR__);
 
 /*
 |--------------------------------------------------------------------------
@@ -17,7 +18,7 @@ uses(PackageTestCase::class)->in(__DIR__);
 |
 */
 
-// uses(Tests\TestCase::class)->in('Feature');
+// uses(PackageTestCase::class, RefreshDatabase::class)->in('Feature');
 
 /*
 |--------------------------------------------------------------------------
