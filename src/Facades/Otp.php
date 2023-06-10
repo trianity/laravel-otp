@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static object generate(string $identifier)
- * @method static object setValidity(array $params)
- * @method static object setAllowedAttempts(array $params)
+ * @method static object setValidity(int $params)
+ * @method static object setAllowedAttempts(int $params)
  */
 class Otp extends Facade
 {
