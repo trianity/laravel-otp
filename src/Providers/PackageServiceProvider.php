@@ -20,11 +20,14 @@ class PackageServiceProvider extends ServiceProvider
             fn () => ['Version' => '10.0.1']
         );
 
-        $this->publishes([
-            dirname(__FILE__, 3).'/config/otp.php' => base_path('config/otp.php'),
-        ], 'otp-config');
+        $this->loadTranslationsFrom(dirname(__FILE__, 3).'/lang', 'otp');
 
         $this->loadMigrationsFrom(dirname(__FILE__, 3).'/database/migrations');
+
+        $this->publishes([
+            dirname(__FILE__, 3).'/config/otp.php' => base_path('config/otp.php'),
+            dirname(__FILE__, 3).'/lang' => $this->app->langPath('vendor/otp'),
+        ], 'otp');
 
         if ($this->app->runningInConsole()) {
             $this->commands([

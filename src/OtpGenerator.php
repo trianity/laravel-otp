@@ -100,7 +100,8 @@ class OtpGenerator
             return (object) [
                 'status' => true,
                 'token' => $otp->token,
-                'message' => 'OTP generated',
+                'message' => trans('otp::messages.otp_generated'),
+                'code' => 0,
             ];
         }
 
@@ -114,21 +115,24 @@ class OtpGenerator
         if (! $otp instanceof OtpModel) {
             return (object) [
                 'status' => false,
-                'message' => 'OTP does not exists, Please generate new OTP',
+                'message' => trans('otp::messages.otp_missing'),
+                'code' => 1,
             ];
         }
 
         if ($otp->isExpired()) {
             return (object) [
                 'status' => false,
-                'message' => 'OTP is expired',
+                'message' => trans('otp::messages.otp_expired'),
+                'code' => 1,
             ];
         }
 
         if ($otp->no_times_attempted === $this->allowedAttempts) {
             return (object) [
                 'status' => false,
-                'message' => 'Reached the maximum allowed attempts',
+                'message' => trans('otp::messages.otp_max_reached'),
+                'code' => 3,
             ];
         }
 
@@ -137,13 +141,15 @@ class OtpGenerator
         if (Str::of($otp->token)->exactly($token)) {
             return (object) [
                 'status' => true,
-                'message' => 'OTP is valid',
+                'message' => trans('otp::messages.otp_valid'),
+                'code' => 0,
             ];
         }
 
         return (object) [
             'status' => false,
-            'message' => 'OTP does not match',
+            'message' => trans('otp::messages.otp_wrong'),
+            'code' => 2,
         ];
     }
 
@@ -154,13 +160,15 @@ class OtpGenerator
         if (! $otp) {
             return (object) [
                 'status' => false,
-                'message' => 'OTP does not exists, Please generate new OTP',
+                'message' => trans('otp::messages.otp_missing'),
+                'code' => 1,
             ];
         }
 
         return (object) [
             'status' => true,
             'expired_at' => $otp->expiredAt(),
+            'code' => 0,
         ];
     }
 
@@ -169,7 +177,8 @@ class OtpGenerator
         if ($otp->no_times_generated === $this->maximumOtpsAllowed) {
             return (object) [
                 'status' => false,
-                'message' => 'Reached the maximum times to generate OTP',
+                'message' => trans('otp::messages.otp_max_gen'),
+                'code' => 3,
             ];
         }
 
@@ -185,7 +194,8 @@ class OtpGenerator
         return (object) [
             'status' => true,
             'token' => $otp->token,
-            'message' => 'OTP generated',
+            'message' => trans('otp::messages.otp_generated'),
+            'code' => 0,
         ];
     }
 
