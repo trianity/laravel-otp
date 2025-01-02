@@ -62,7 +62,7 @@ class PackageServiceProvider extends ServiceProvider
     protected function registerBindings(): void
     {
         $this->app->singleton('otp', function () {
-            return new OtpGenerator();
+            return new OtpGenerator;
         });
 
         $this->app->alias('otp', OtpGenerator::class);

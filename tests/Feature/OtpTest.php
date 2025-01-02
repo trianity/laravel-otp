@@ -114,6 +114,6 @@ it('can get expired at time', function () {
     $identifier = Str::random(12);
     Otp::generate($identifier);
     $expires = Otp::expiredAt($identifier);
-    //The default expiry time: 30 min.
-    expect($expires->expired_at->diffInMinutes())->toBe(29);
+    // The default expiry time: 30 min.
+    expect(intval(round($expires->expired_at->diffInMinutes())))->toBe(-30);
 });

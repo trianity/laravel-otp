@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests;
+namespace Trianity\Otp\Tests;
 
 use PHPUnit\Framework\TestCase as BaseTestCase;
 
