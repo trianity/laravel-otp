@@ -4,9 +4,11 @@ namespace Trianity\Otp\Tests;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Trianity\Otp\Facades\Otp;
 use Trianity\Otp\Models\Otp as OtpModel;
+use Trianity\Otp\Rules\OtpRule;
 
 it('can generate and validate otp', function () {
     $identifier = Str::random(12);
@@ -14,6 +16,34 @@ it('can generate and validate otp', function () {
     $validator = Otp::validate($identifier, $otp->token);
 
     expect($validator->status)->toBeTrue();
+});
+
+it('can validate otp tokens with the validation rule', function () {
+    $identifier = Str::random(12);
+    $otp = Otp::generate($identifier);
+
+    $validator = Validator::make([
+        'otp' => $otp->token,
+    ], [
+        'otp' => ['required', new OtpRule($identifier)],
+    ]);
+
+    expect($validator->passes())->toBeTrue()
+        ->and(Otp::validate($identifier, $otp->token)->status)->toBeFalse();
+});
+
+it('rejects invalid otp tokens with the validation rule', function () {
+    $identifier = Str::random(12);
+    Otp::generate($identifier);
+
+    $validator = Validator::make([
+        'otp' => 'wrong-token',
+    ], [
+        'otp' => ['required', new OtpRule($identifier)],
+    ]);
+
+    expect($validator->fails())->toBeTrue()
+        ->and($validator->errors()->first('otp'))->toBe(trans('otp::messages.otp_wrong'));
 });
 
 it('expires the otp after a successful validation', function () {

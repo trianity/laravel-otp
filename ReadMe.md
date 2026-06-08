@@ -75,6 +75,58 @@ $expires = Otp::expiredAt($identifier);
 
 The returned object contains an `expired_at` Carbon instance when the OTP exists.
 
+## Validation Rule
+
+Use `Trianity\Otp\Rules\OtpRule` when the OTP check belongs in a Laravel
+validator or `FormRequest`.
+
+```php
+use Trianity\Otp\Rules\OtpRule;
+
+$request->validate([
+    'otp' => ['required', 'string', new OtpRule($identifier)],
+]);
+```
+
+The rule calls `Otp::validate()`. A successful validation consumes the OTP, so
+use it only in the final step of the login or verification flow.
+
+## Controller Example
+
+The package does not register application routes. Keep routing, guards, user
+lookup, session handling, and responses in your app:
+
+```php
+<?php
+
+namespace App\Http\Controllers\Auth;
+
+use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Trianity\Otp\Rules\OtpRule;
+
+class OtpLoginController extends Controller
+{
+    public function verify(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'string', new OtpRule($request->string('email')->toString())],
+        ]);
+
+        $user = User::where('email', $data['email'])->firstOrFail();
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->intended('/dashboard');
+    }
+}
+```
+
 ## Configuration
 
 You can configure the package in `config/otp.php`:

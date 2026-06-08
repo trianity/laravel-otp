@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 return [
     'otp_generated' => 'OTP generated',
-    'otp_missing' => 'OTP does not exists, Please generate new OTP',
+    'otp_missing' => 'OTP does not exist. Please generate a new OTP.',
     'otp_expired' => 'OTP is expired',
     'otp_max_reached' => 'Reached the maximum allowed attempts',
     'otp_valid' => 'OTP is valid',
