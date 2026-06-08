@@ -17,7 +17,7 @@ class PackageServiceProvider extends ServiceProvider
     {
         AboutCommand::add(
             'Laravel OTP Package',
-            fn () => ['Version' => '10.0.1']
+            fn () => ['Version' => '13.0.1']
         );
 
         $this->loadTranslationsFrom(dirname(__FILE__, 3).'/lang', 'otp');

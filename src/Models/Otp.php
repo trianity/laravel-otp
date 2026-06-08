@@ -21,7 +21,7 @@ class Otp extends Model
     /**
      * The attributes that are mass assignable.
      *
-     * @var array<int, string>
+     * @var list<string>
      */
     protected $fillable = [
         'identifier', 'token', 'validity', 'expired', 'no_times_generated', 'generated_at',
