@@ -6,6 +6,10 @@ and validation attempt limits.
 
 The package was inspired by `seshac/otp-generator`.
 
+Generated OTP values are returned only from `generate()`. The database stores a
+hash of the token, and a successfully validated OTP is immediately expired so it
+cannot be reused.
+
 ## Requirements
 
 - PHP 8.2 or newer
@@ -60,6 +64,9 @@ Successful validation returns an object similar to:
 ]
 ```
 
+After a successful validation, validating the same OTP again returns a failed
+response because the stored record is marked as expired.
+
 Get the expiration time for an existing OTP:
 
 ```php
@@ -105,6 +112,9 @@ $verify = Otp::setAllowedAttempts(10)
     ->validate($identifier, $otp->token);
 ```
 
+Fluent overrides apply to the current terminal call only. After `generate()`,
+`validate()`, or `expiredAt()`, the generator resets to `config/otp.php` values.
+
 Available fluent setters map to the package settings:
 
 - `setValidity(int $minutes)`
@@ -113,6 +123,11 @@ Available fluent setters map to the package settings:
 - `setOnlyDigits(bool $onlyDigits)`
 - `setUseSameToken(bool $useSameToken)`
 - `setAllowedAttempts(int $count)`
+
+Because tokens are stored as hashes, `setUseSameToken(true)` keeps the existing
+stored token valid for the identifier, but it cannot return the original plain
+token on later calls. If you need to resend the same code, keep the generated
+token from the original `generate()` response in your delivery flow.
 
 ## Testing
 

@@ -9,7 +9,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $identifier
- * @property string $token
+ * @property string $token Hashed OTP token.
  * @property int $validity
  * @property bool $expired
  * @property int $no_times_generated
@@ -28,7 +28,11 @@ class Otp extends Model
     ];
 
     protected $casts = [
+        'expired' => 'boolean',
         'generated_at' => 'datetime',
+        'no_times_attempted' => 'integer',
+        'no_times_generated' => 'integer',
+        'validity' => 'integer',
     ];
 
     public function isExpired(): bool

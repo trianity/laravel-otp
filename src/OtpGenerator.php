@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Trianity\Otp;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Trianity\Otp\Models\Otp as OtpModel;
 
@@ -47,13 +49,7 @@ class OtpGenerator
 
     public function __construct()
     {
-        $this->length = config('otp.length');
-        $this->onlyDigits = config('otp.onlyDigits');
-        $this->useSameToken = config('otp.useSameToken');
-        $this->validity = config('otp.validity');
-        $this->deleteOldOtps = config('otp.deleteOldOtps');
-        $this->maximumOtpsAllowed = config('otp.maximumOtpsAllowed');
-        $this->allowedAttempts = config('otp.allowedAttempts');
+        $this->resetConfig();
     }
 
     /**
@@ -61,7 +57,7 @@ class OtpGenerator
      * matching property to the value passed to the method and return a chainable
      * object to the caller.
      *
-     * @param  array<int, string>  $params
+     * @param  array<int, mixed>  $params
      */
     public function __call(string $method, array $params): ?object
     {
@@ -83,93 +79,120 @@ class OtpGenerator
 
     public function generate(string $identifier): object
     {
-        $this->deleteOldOtps();
+        try {
+            $this->deleteOldOtps();
 
-        $otp = OtpModel::where('identifier', $identifier)->first();
+            $otp = OtpModel::where('identifier', $identifier)->first();
 
-        if (! $otp instanceof OtpModel) {
-            $otp = OtpModel::create([
-                'identifier' => $identifier,
-                'token' => $this->createPin(),
-                'validity' => $this->validity,
-                'generated_at' => Carbon::now(),
-            ]);
+            if (! $otp instanceof OtpModel) {
+                $token = $this->createPin();
 
-            $otp->increment('no_times_generated');
+                try {
+                    $otp = OtpModel::create([
+                        'identifier' => $identifier,
+                        'token' => Hash::make($token),
+                        'validity' => $this->validity,
+                        'generated_at' => Carbon::now(),
+                    ]);
+                } catch (QueryException $exception) {
+                    $otp = OtpModel::where('identifier', $identifier)->first();
 
-            return (object) [
-                'status' => true,
-                'token' => $otp->token,
-                'message' => trans('otp::messages.otp_generated'),
-                'code' => 0,
-            ];
+                    if ($otp instanceof OtpModel) {
+                        return $this->updateOtp($otp, $identifier);
+                    }
+
+                    throw $exception;
+                }
+
+                $otp->increment('no_times_generated');
+
+                return (object) [
+                    'status' => true,
+                    'token' => $token,
+                    'message' => trans('otp::messages.otp_generated'),
+                    'code' => 0,
+                ];
+            }
+
+            return $this->updateOtp($otp, $identifier);
+        } finally {
+            $this->resetConfig();
         }
-
-        return $this->updateOtp($otp, $identifier);
     }
 
     public function validate(string $identifier, string $token): object
     {
-        $otp = OtpModel::where('identifier', $identifier)->first();
+        try {
+            $otp = OtpModel::where('identifier', $identifier)->first();
 
-        if (! $otp instanceof OtpModel) {
-            return (object) [
-                'status' => false,
-                'message' => trans('otp::messages.otp_missing'),
-                'code' => 1,
-            ];
-        }
+            if (! $otp instanceof OtpModel) {
+                return (object) [
+                    'status' => false,
+                    'message' => trans('otp::messages.otp_missing'),
+                    'code' => 1,
+                ];
+            }
 
-        if ($otp->isExpired()) {
-            return (object) [
-                'status' => false,
-                'message' => trans('otp::messages.otp_expired'),
-                'code' => 1,
-            ];
-        }
+            if ($otp->isExpired()) {
+                return (object) [
+                    'status' => false,
+                    'message' => trans('otp::messages.otp_expired'),
+                    'code' => 1,
+                ];
+            }
 
-        if ($otp->no_times_attempted === $this->allowedAttempts) {
-            return (object) [
-                'status' => false,
-                'message' => trans('otp::messages.otp_max_reached'),
-                'code' => 3,
-            ];
-        }
+            if ($otp->no_times_attempted >= $this->allowedAttempts) {
+                return (object) [
+                    'status' => false,
+                    'message' => trans('otp::messages.otp_max_reached'),
+                    'code' => 3,
+                ];
+            }
 
-        $otp->increment('no_times_attempted');
+            $otp->increment('no_times_attempted');
 
-        if (Str::of($otp->token)->exactly($token)) {
+            if (! Hash::check($token, $otp->token)) {
+                return (object) [
+                    'status' => false,
+                    'message' => trans('otp::messages.otp_wrong'),
+                    'code' => 2,
+                ];
+            }
+
+            $otp->expired = true;
+            $otp->save();
+
             return (object) [
                 'status' => true,
                 'message' => trans('otp::messages.otp_valid'),
                 'code' => 0,
             ];
+        } finally {
+            $this->resetConfig();
         }
-
-        return (object) [
-            'status' => false,
-            'message' => trans('otp::messages.otp_wrong'),
-            'code' => 2,
-        ];
     }
 
     public function expiredAt(string $identifier): object
     {
-        $otp = OtpModel::where('identifier', $identifier)->first();
+        try {
+            $otp = OtpModel::where('identifier', $identifier)->first();
 
-        if (! $otp) {
+            if (! $otp) {
+                return (object) [
+                    'status' => false,
+                    'message' => trans('otp::messages.otp_missing'),
+                    'code' => 1,
+                ];
+            }
+
             return (object) [
-                'status' => false,
-                'message' => trans('otp::messages.otp_missing'),
-                'code' => 1,
+                'status' => true,
+                'expired_at' => $otp->expiredAt(),
+                'code' => 0,
             ];
+        } finally {
+            $this->resetConfig();
         }
-
-        return (object) [
-            'status' => true,
-            'expired_at' => $otp->expiredAt(),
-            'code' => 0,
-        ];
     }
 
     protected function updateOtp(OtpModel $otp, string $identifier): object
@@ -182,9 +205,11 @@ class OtpGenerator
             ];
         }
 
+        $token = $this->useSameToken ? null : $this->createPin();
+
         $otp->update([
             'identifier' => $identifier,
-            'token' => $this->useSameToken ? $otp->token : $this->createPin(),
+            'token' => $token === null ? $otp->token : Hash::make($token),
             'validity' => $this->validity,
             'generated_at' => Carbon::now(),
         ]);
@@ -193,7 +218,7 @@ class OtpGenerator
 
         return (object) [
             'status' => true,
-            'token' => $otp->token,
+            'token' => $token,
             'message' => trans('otp::messages.otp_generated'),
             'code' => 0,
         ];
@@ -202,8 +227,19 @@ class OtpGenerator
     private function deleteOldOtps(): void
     {
         OtpModel::where('expired', true)
-            ->orWhere('created_at', '<', Carbon::now()->subMinutes($this->deleteOldOtps))
+            ->orWhere('generated_at', '<', Carbon::now()->subMinutes($this->deleteOldOtps))
             ->delete();
+    }
+
+    private function resetConfig(): void
+    {
+        $this->length = (int) config('otp.length');
+        $this->onlyDigits = filter_var(config('otp.onlyDigits'), FILTER_VALIDATE_BOOL);
+        $this->useSameToken = filter_var(config('otp.useSameToken'), FILTER_VALIDATE_BOOL);
+        $this->validity = (int) config('otp.validity');
+        $this->deleteOldOtps = (int) config('otp.deleteOldOtps');
+        $this->maximumOtpsAllowed = (int) config('otp.maximumOtpsAllowed');
+        $this->allowedAttempts = (int) config('otp.allowedAttempts');
     }
 
     private function createPin(): string

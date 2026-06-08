@@ -17,7 +17,7 @@ class PackageServiceProvider extends ServiceProvider
     {
         AboutCommand::add(
             'Laravel OTP Package',
-            fn () => ['Version' => '13.0.1']
+            fn () => ['Version' => '13.1.0']
         );
 
         $this->loadTranslationsFrom(dirname(__FILE__, 3).'/lang', 'otp');
@@ -61,7 +61,7 @@ class PackageServiceProvider extends ServiceProvider
 
     protected function registerBindings(): void
     {
-        $this->app->singleton('otp', function () {
+        $this->app->bind('otp', function () {
             return new OtpGenerator;
         });
 

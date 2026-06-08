@@ -2,8 +2,11 @@
 
 namespace Trianity\Otp\Tests;
 
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Trianity\Otp\Facades\Otp;
+use Trianity\Otp\Models\Otp as OtpModel;
 
 it('can generate and validate otp', function () {
     $identifier = Str::random(12);
@@ -11,6 +14,35 @@ it('can generate and validate otp', function () {
     $validator = Otp::validate($identifier, $otp->token);
 
     expect($validator->status)->toBeTrue();
+});
+
+it('expires the otp after a successful validation', function () {
+    $identifier = Str::random(12);
+    $otp = Otp::generate($identifier);
+
+    expect(Otp::validate($identifier, $otp->token)->status)->toBeTrue()
+        ->and(Otp::validate($identifier, $otp->token)->status)->toBeFalse();
+});
+
+it('stores the otp token as a hash', function () {
+    $identifier = Str::random(12);
+    $otp = Otp::generate($identifier);
+    $storedOtp = OtpModel::query()->where('identifier', $identifier)->firstOrFail();
+
+    expect($storedOtp->token)->not->toBe($otp->token)
+        ->and(Hash::check($otp->token, $storedOtp->token))->toBeTrue();
+});
+
+it('requires a unique identifier for stored otps', function () {
+    $identifier = Str::random(12);
+    Otp::generate($identifier);
+
+    expect(fn () => OtpModel::query()->create([
+        'identifier' => $identifier,
+        'token' => Hash::make('123456'),
+        'validity' => config('otp.validity'),
+        'generated_at' => now(),
+    ]))->toThrow(QueryException::class);
 });
 
 it('cant able to verify the opt once get expired', function () {
@@ -56,6 +88,19 @@ it('can delete the otps after spceifed amount of time', function () {
     $this->travelBack();
 });
 
+it('does not delete regenerated otps based on their original creation time', function () {
+    $identifier = Str::random(12);
+    Otp::generate($identifier);
+    $storedOtp = OtpModel::query()->where('identifier', $identifier)->firstOrFail();
+
+    $this->travel(20)->minutes();
+    Otp::generate($identifier);
+    $this->travel(12)->minutes();
+    Otp::generate(Str::random(13));
+
+    expect(OtpModel::query()->whereKey($storedOtp->getKey())->exists())->toBeTrue();
+});
+
 it('cant able to verify the otp once reach the maximum allowedAttempts', function () {
     $identifier = Str::random(12);
     $otp = Otp::generate($identifier);
@@ -92,7 +137,8 @@ it('can set custom number of allowed attempts', function () {
         Otp::setAllowedAttempts($allowedAttempts)
             ->validate($identifier, 'wrongToken');
     }
-    $validator = Otp::validate($identifier, $otp->token);
+    $validator = Otp::setAllowedAttempts($allowedAttempts)
+        ->validate($identifier, $otp->token);
     expect($validator->status)->toBeTrue();
 });
 
@@ -103,11 +149,22 @@ it('can set custom otp length', function () {
     expect(strlen($otp->token))->toBe(8);
 });
 
-it('can get the same token on second time onwards', function () {
+it('resets custom otp length after a generate call', function () {
+    $customLengthOtp = Otp::setLength(8)
+        ->generate(Str::random(12));
+    $defaultLengthOtp = Otp::generate(Str::random(12));
+
+    expect(strlen($customLengthOtp->token))->toBe(8)
+        ->and(strlen($defaultLengthOtp->token))->toBe(config('otp.length'));
+});
+
+it('can keep the same stored token valid on second time onwards', function () {
     $identifier = Str::random(12);
     $otp1 = Otp::generate($identifier);
     $otp2 = Otp::setUseSameToken(true)->generate($identifier);
-    expect($otp1->token)->toBe($otp2->token);
+
+    expect($otp2->token)->toBeNull()
+        ->and(Otp::validate($identifier, $otp1->token)->status)->toBeTrue();
 });
 
 it('can get expired at time', function () {
