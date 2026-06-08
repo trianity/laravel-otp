@@ -216,7 +216,7 @@ class OtpGenerator
         $length = strlen($characters);
         $pin = '';
         for ($i = 0; $i < $this->length; $i++) {
-            $pin .= $characters[rand(0, $length - 1)];
+            $pin .= $characters[random_int(0, $length - 1)];
         }
 
         return $pin;
