@@ -1,19 +1,23 @@
-# Laravel One Time Password (OTP)
+# Laravel OTP
 
-OTP generator and validator for Laravel applications. It stores OTP records in
-the database, supports configurable token length, expiry, regeneration limits,
-and validation attempt limits.
+OTP generator and validator for Laravel applications. The package stores OTP
+records in the database and supports configurable token length, expiry,
+regeneration limits, and validation attempt limits.
 
 The package was inspired by `seshac/otp-generator`.
 
 Generated OTP values are returned only from `generate()`. The database stores a
-hash of the token, and a successfully validated OTP is immediately expired so it
-cannot be reused.
+hash of the token, and a successfully validated OTP is immediately marked as
+expired so it cannot be reused.
 
 ## Requirements
 
-- PHP 8.2 or newer
-- Laravel 10, 11, 12, or 13
+- PHP 8.4 or PHP 8.5
+- Laravel 12 or Laravel 13 (Laravel 13 is the primary target)
+
+The package follows the Laravel 13 and PHP 8.4/8.5 package conventions. The
+runtime dependency is declared in `composer.json` as PHP `^8.4` and
+`illuminate/support` `^12.0|^13.0`.
 
 ## Installation
 
@@ -23,7 +27,7 @@ Install the package with Composer:
 composer require trianity/laravel-otp
 ```
 
-The package automatically loads its migration. Run your migrations after
+The package automatically loads its migrations. Run your migrations after
 installation:
 
 ```bash
@@ -36,12 +40,12 @@ Publish the configuration and translation files when you want to customize them:
 php artisan vendor:publish --provider="Trianity\Otp\Providers\PackageServiceProvider" --tag="otp"
 ```
 
-This publishes:
+This publishes the following files:
 
 - `config/otp.php`
 - `lang/vendor/otp`
 
-## Usage
+## Basic Usage
 
 ```php
 use Illuminate\Support\Str;
@@ -53,6 +57,10 @@ $otp = Otp::generate($identifier);
 
 $verify = Otp::validate($identifier, $otp->token);
 ```
+
+`generate()` returns an object with `status`, `token`, `message`, and `code`.
+The plain-text token is available in the response only; it is never stored in
+the database.
 
 Successful validation returns an object similar to:
 
@@ -73,7 +81,12 @@ Get the expiration time for an existing OTP:
 $expires = Otp::expiredAt($identifier);
 ```
 
-The returned object contains an `expired_at` Carbon instance when the OTP exists.
+The returned object contains an `expired_at` Carbon instance when the OTP
+exists.
+
+If an OTP does not exist, has expired, or has reached its attempt limit,
+`validate()` returns `status => false`. A successful validation consumes the
+OTP.
 
 ## Validation Rule
 
@@ -143,6 +156,10 @@ return [
 ];
 ```
 
+The default configuration allows five validation attempts and five generated
+OTPs per identifier during the cleanup period. The `OPT_LENGTH` variable name
+is retained for compatibility with the package configuration.
+
 ## Advanced Usage
 
 Configuration values can also be overridden fluently for a call chain:
@@ -177,9 +194,20 @@ Available fluent setters map to the package settings:
 - `setAllowedAttempts(int $count)`
 
 Because tokens are stored as hashes, `setUseSameToken(true)` keeps the existing
-stored token valid for the identifier, but it cannot return the original plain
-token on later calls. If you need to resend the same code, keep the generated
-token from the original `generate()` response in your delivery flow.
+stored token valid for the identifier, but it returns `token => null` on later
+calls. If you need to resend the same code, keep the generated token from the
+original `generate()` response in your delivery flow.
+
+## Database and cleanup
+
+The package loads its OTP migration automatically. Each identifier has one
+stored OTP record; regenerating an OTP updates that record. Expired records and
+records older than `deleteOldOtps` minutes are removed when a new OTP is
+generated.
+
+The package does not register routes, send messages, or implement a login flow.
+Deliver the returned token through the channel used by your application and
+keep routing, user lookup, guards, sessions, and responses in your app.
 
 ## Testing
 
