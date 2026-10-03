@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Trianity\Otp\Providers;
 
+use Composer\InstalledVersions;
 use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
 use Trianity\Otp\OtpGenerator;
@@ -17,7 +18,11 @@ class PackageServiceProvider extends ServiceProvider
     {
         AboutCommand::add(
             'Laravel OTP Package',
-            fn () => ['Version' => '13.1.1']
+            fn () => [
+                'Version' => InstalledVersions::isInstalled('trianity/laravel-otp')
+                    ? (InstalledVersions::getPrettyVersion('trianity/laravel-otp') ?? 'unknown')
+                    : 'unknown',
+            ],
         );
 
         $this->loadTranslationsFrom(dirname(__FILE__, 3).'/lang', 'otp');

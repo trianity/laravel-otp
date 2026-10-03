@@ -1,5 +1,7 @@
 # Laravel OTP
 
+[Source code](https://github.com/trianity/laravel-otp) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
+
 OTP generator and validator for Laravel applications. The package stores OTP
 records in the database and supports configurable token length, expiry,
 regeneration limits, and validation attempt limits.
@@ -10,22 +12,24 @@ Generated OTP values are returned only from `generate()`. The database stores a
 hash of the token, and a successfully validated OTP is immediately marked as
 expired so it cannot be reused.
 
-## Requirements
+## Requirements for 1.0.0
 
-- PHP 8.4 or PHP 8.5
-- Laravel 12 or Laravel 13 (Laravel 13 is the primary target)
+- PHP `^8.4` (including PHP 8.4 and 8.5)
+- Laravel 12 or Laravel 13 (`illuminate/support` `^12.0|^13.0`)
 
-The package follows the Laravel 13 and PHP 8.4/8.5 package conventions. The
-runtime dependency is declared in `composer.json` as PHP `^8.4` and
-`illuminate/support` `^12.0|^13.0`.
+Laravel 13 is the primary target. A database connection configured in your
+Laravel application is required to store OTP records.
 
 ## Installation
 
-Install the package with Composer:
+Once version 1.0.0 is published on Packagist, install the stable 1.x series with Composer:
 
 ```bash
-composer require trianity/laravel-otp
+composer require trianity/laravel-otp:^1.0
 ```
+
+Laravel automatically discovers the service provider and the `Otp` facade;
+manual registration is not required.
 
 The package automatically loads its migrations. Run your migrations after
 installation:
@@ -55,10 +59,15 @@ $identifier = Str::random(12);
 
 $otp = Otp::generate($identifier);
 
-$verify = Otp::validate($identifier, $otp->token);
+if ($otp->status && $otp->token !== null) {
+    // Deliver this token through your application, then validate the submitted code.
+    $verify = Otp::validate($identifier, $otp->token);
+}
 ```
 
-`generate()` returns an object with `status`, `token`, `message`, and `code`.
+On success, `generate()` returns an object with `status`, `token`, `message`, and `code`.
+On failure, it returns `status => false`, `message`, and `code`; check `status`
+before accessing `token`.
 The plain-text token is available in the response only; it is never stored in
 the database.
 
@@ -211,11 +220,18 @@ keep routing, user lookup, guards, sessions, and responses in your app.
 
 ## Testing
 
+From a source checkout, install development dependencies and run the checks:
+
 ```bash
+composer install
 ./vendor/bin/pest
 ./vendor/bin/phpstan analyse
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the 1.0.0 release notes and subsequent changes.
+
 ## License
 
-The MIT License (MIT). Please see the license file for more information.
+This package is licensed under the [MIT License](LICENSE).
