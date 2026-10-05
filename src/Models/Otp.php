@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Trianity\Otp\Models;
 
+use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Trianity\Otp\Contracts\OtpClock;
+use Trianity\Otp\LaravelOtpClock;
 
 /**
  * @property string $identifier
@@ -35,15 +38,19 @@ class Otp extends Model
         'validity' => 'integer',
     ];
 
-    public function isExpired(): bool
+    public function isExpired(?DateTimeImmutable $now = null): bool
     {
         if ($this->expired) {
             return true;
         }
 
+        $now ??= app()->bound(OtpClock::class)
+            ? app(OtpClock::class)->now()
+            : (new LaravelOtpClock)->now();
+
         $generatedTime = $this->generated_at->addMinutes($this->validity);
 
-        if (strtotime(strval($generatedTime)) >= strtotime(Carbon::now()->toDateTimeString())) {
+        if ($generatedTime->getTimestamp() >= $now->getTimestamp()) {
             return false;
         }
 

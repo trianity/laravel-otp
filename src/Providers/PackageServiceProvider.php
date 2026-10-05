@@ -7,6 +7,8 @@ namespace Trianity\Otp\Providers;
 use Composer\InstalledVersions;
 use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
+use Trianity\Otp\Contracts\OtpClock;
+use Trianity\Otp\LaravelOtpClock;
 use Trianity\Otp\OtpGenerator;
 
 class PackageServiceProvider extends ServiceProvider
@@ -66,8 +68,10 @@ class PackageServiceProvider extends ServiceProvider
 
     protected function registerBindings(): void
     {
-        $this->app->bind('otp', function () {
-            return new OtpGenerator;
+        $this->app->bindIf(OtpClock::class, LaravelOtpClock::class);
+
+        $this->app->bind('otp', function ($app) {
+            return new OtpGenerator($app->make(OtpClock::class));
         });
 
         $this->app->alias('otp', OtpGenerator::class);

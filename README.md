@@ -12,7 +12,7 @@ Generated OTP values are returned only from `generate()`. The database stores a
 hash of the token, and a successfully validated OTP is immediately marked as
 expired so it cannot be reused.
 
-## Requirements for 2.0.0
+## Requirements for 2.x
 
 - PHP `^8.4` (including PHP 8.4 and 8.5)
 - Laravel 12 or Laravel 13 (`illuminate/support` `^12.0|^13.0`)
@@ -211,6 +211,90 @@ stored token valid for the identifier, but it returns `token => null` on later
 calls. If you need to resend the same code, keep the generated token from the
 original `generate()` response in your delivery flow.
 
+## Custom OTP clock
+
+Version 2.1 adds the optional `Trianity\Otp\Contracts\OtpClock` extension point:
+
+```php
+public function now(): \DateTimeImmutable;
+```
+
+By default, `LaravelOtpClock` reads Laravel's Carbon clock on every call. This
+preserves the existing application timezone and Carbon test-time behaviour; it
+does not capture a time in its constructor or change global clock state.
+
+An application that needs OTPs to use the real system clock while its global
+Carbon clock is frozen can provide a native implementation:
+
+```php
+<?php
+
+namespace App\Support;
+
+use DateTimeImmutable;
+use DateTimeZone;
+use Trianity\Otp\Contracts\OtpClock;
+
+final class SystemOtpClock implements OtpClock
+{
+    private readonly DateTimeZone $timezone;
+
+    public function __construct()
+    {
+        $this->timezone = new DateTimeZone('UTC');
+    }
+
+    public function now(): DateTimeImmutable
+    {
+        return new DateTimeImmutable('now', $this->timezone);
+    }
+}
+```
+
+Bind it from an application service provider:
+
+```php
+use App\Support\SystemOtpClock;
+use Trianity\Otp\Contracts\OtpClock;
+
+public function register(): void
+{
+    $this->app->singleton(OtpClock::class, SystemOtpClock::class);
+}
+```
+
+The same binding must be loaded in HTTP, queue-worker, and console processes so
+all OTP lifecycle decisions use one time source. A long-running clock service
+must calculate the current time inside `now()` rather than storing its
+construction time.
+
+Automated tests can bind a mutable fake without changing Carbon globally:
+
+```php
+$fakeClock = new class(new \DateTimeImmutable('2026-10-05 21:21:35 UTC')) implements OtpClock
+{
+    public function __construct(private \DateTimeImmutable $currentTime) {}
+
+    public function now(): \DateTimeImmutable
+    {
+        return $this->currentTime;
+    }
+
+    public function advance(\DateInterval $interval): void
+    {
+        $this->currentTime = $this->currentTime->add($interval);
+    }
+};
+
+$this->app->instance(OtpClock::class, $fakeClock);
+$fakeClock->advance(new \DateInterval('PT26S'));
+```
+
+Restore the binding after the test, for example with
+`$this->app->forgetInstance(OtpClock::class)`. Changing clocks does not migrate,
+rewrite, or delete existing OTP records. Plan how active codes will be
+invalidated or allowed to expire before switching between time sources.
+
 ## Database and cleanup
 
 The package loads its OTP migration automatically. Each identifier has one
@@ -220,9 +304,10 @@ generated.
 
 `generated_at` is application-managed. It changes when `generate()` creates or
 regenerates an OTP, including a `useSameToken` resend, but not when counters or
-other columns change. Generation and expiry checks both use Laravel's Carbon
-application clock, so Laravel's test clock controls both operations. An OTP is
-valid through its exact expiry instant and is expired immediately after it.
+other columns change. Generation, regeneration, expiry checks, and cleanup use
+the bound `OtpClock`. With the default binding, Laravel's Carbon test clock
+continues to control all these operations. An OTP is valid through its exact
+expiry instant and is expired immediately after it.
 
 The package does not register routes, send messages, or implement a login flow.
 Deliver the returned token through the channel used by your application and

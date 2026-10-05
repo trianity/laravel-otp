@@ -4,6 +4,31 @@ All notable changes to this package are documented in this file.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-05
+
+### Added
+
+- Added the public `Trianity\Otp\Contracts\OtpClock` interface and an
+  overridable container binding for applications that need an OTP-specific time
+  source.
+- Added `LaravelOtpClock` as the default implementation, preserving Laravel's
+  timezone and Carbon test-time behaviour.
+
+### Changed
+
+- Generation, regeneration, validation expiry checks, and old-record cleanup
+  now use the same injected clock.
+- `OtpGenerator` accepts an optional clock constructor argument while existing
+  zero-argument construction and facade/service APIs remain supported.
+
+### Compatibility
+
+- The default behaviour is unchanged and continues to follow Laravel's Carbon
+  clock.
+- Changing the clock does not migrate existing OTP timestamps. Applications
+  must plan the handling of active codes when switching time sources.
+- No database migration is required when upgrading from 2.0.0.
+
 ## [2.0.0] - 2026-10-05
 
 ### Fixed

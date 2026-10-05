@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Trianity\Otp;
 
+use Carbon\CarbonImmutable;
+use DateTimeImmutable;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Trianity\Otp\Contracts\OtpClock;
 use Trianity\Otp\Models\Otp as OtpModel;
 
 class OtpGenerator
@@ -47,8 +49,11 @@ class OtpGenerator
      */
     protected int $allowedAttempts;
 
-    public function __construct()
+    protected OtpClock $clock;
+
+    public function __construct(?OtpClock $clock = null)
     {
+        $this->clock = $clock ?? new LaravelOtpClock;
         $this->resetConfig();
     }
 
@@ -80,7 +85,8 @@ class OtpGenerator
     public function generate(string $identifier): object
     {
         try {
-            $this->deleteOldOtps();
+            $now = $this->clock->now();
+            $this->deleteOldOtps($now);
 
             $otp = OtpModel::where('identifier', $identifier)->first();
 
@@ -93,13 +99,13 @@ class OtpGenerator
                         'token' => Hash::make($token),
                         'validity' => $this->validity,
                         'no_times_generated' => 1,
-                        'generated_at' => Carbon::now(),
+                        'generated_at' => $now,
                     ]);
                 } catch (QueryException $exception) {
                     $otp = OtpModel::where('identifier', $identifier)->first();
 
                     if ($otp instanceof OtpModel) {
-                        return $this->updateOtp($otp, $identifier);
+                        return $this->updateOtp($otp, $identifier, $now);
                     }
 
                     throw $exception;
@@ -113,7 +119,7 @@ class OtpGenerator
                 ];
             }
 
-            return $this->updateOtp($otp, $identifier);
+            return $this->updateOtp($otp, $identifier, $now);
         } finally {
             $this->resetConfig();
         }
@@ -132,7 +138,7 @@ class OtpGenerator
                 ];
             }
 
-            if ($otp->isExpired()) {
+            if ($otp->isExpired($this->clock->now())) {
                 return (object) [
                     'status' => false,
                     'message' => trans('otp::messages.otp_expired'),
@@ -193,7 +199,7 @@ class OtpGenerator
         }
     }
 
-    protected function updateOtp(OtpModel $otp, string $identifier): object
+    protected function updateOtp(OtpModel $otp, string $identifier, DateTimeImmutable $now): object
     {
         if ($otp->no_times_generated === $this->maximumOtpsAllowed) {
             return (object) [
@@ -209,7 +215,7 @@ class OtpGenerator
             'identifier' => $identifier,
             'token' => $token === null ? $otp->token : Hash::make($token),
             'validity' => $this->validity,
-            'generated_at' => Carbon::now(),
+            'generated_at' => $now,
         ]);
 
         return (object) [
@@ -220,10 +226,12 @@ class OtpGenerator
         ];
     }
 
-    private function deleteOldOtps(): void
+    private function deleteOldOtps(DateTimeImmutable $now): void
     {
+        $deleteBefore = CarbonImmutable::instance($now)->subMinutes($this->deleteOldOtps);
+
         OtpModel::where('expired', true)
-            ->orWhere('generated_at', '<', Carbon::now()->subMinutes($this->deleteOldOtps))
+            ->orWhere('generated_at', '<', $deleteBefore)
             ->delete();
     }
 
