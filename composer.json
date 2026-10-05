@@ -44,6 +44,19 @@
       }
     }
   },
+  "scripts": {
+    "test": [
+      "@php ./vendor/bin/pint",
+      "@php ./vendor/bin/phpstan analyse",
+      "@php ./vendor/bin/pest"
+    ],
+    "phpstan": [
+      "@php ./vendor/bin/phpstan analyse"
+    ],
+    "pint": [
+      "@php ./vendor/bin/pint"
+    ]
+  },
   "prefer-stable": true,
   "config": {
     "sort-packages": true,

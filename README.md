@@ -1,6 +1,6 @@
 # Laravel OTP
 
-[Source code](https://github.com/trianity/laravel-otp) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
+[Source code](https://github.com/trianity/laravel-otp) · [Changelog](CHANGELOG.md) · [2.0 upgrade guide](UPGRADE-2.0.md) · [MIT License](LICENSE)
 
 OTP generator and validator for Laravel applications. The package stores OTP
 records in the database and supports configurable token length, expiry,
@@ -12,7 +12,7 @@ Generated OTP values are returned only from `generate()`. The database stores a
 hash of the token, and a successfully validated OTP is immediately marked as
 expired so it cannot be reused.
 
-## Requirements for 1.0.0
+## Requirements for 2.0.0
 
 - PHP `^8.4` (including PHP 8.4 and 8.5)
 - Laravel 12 or Laravel 13 (`illuminate/support` `^12.0|^13.0`)
@@ -22,10 +22,10 @@ Laravel application is required to store OTP records.
 
 ## Installation
 
-Once version 1.0.0 is published on Packagist, install the stable 1.x series with Composer:
+Install the stable 2.x series with Composer:
 
 ```bash
-composer require trianity/laravel-otp:^1.0
+composer require trianity/laravel-otp:^2.0
 ```
 
 Laravel automatically discovers the service provider and the `Otp` facade;
@@ -37,6 +37,10 @@ installation:
 ```bash
 php artisan migrate
 ```
+
+Applications upgrading from 1.0.0 must also run this command so the corrective
+`generated_at` migration is applied. Do not overwrite the old migration or use
+`migrate:fresh`; follow [UPGRADE-2.0.md](UPGRADE-2.0.md).
 
 Publish the configuration and translation files when you want to customize them:
 
@@ -214,6 +218,12 @@ stored OTP record; regenerating an OTP updates that record. Expired records and
 records older than `deleteOldOtps` minutes are removed when a new OTP is
 generated.
 
+`generated_at` is application-managed. It changes when `generate()` creates or
+regenerates an OTP, including a `useSameToken` resend, but not when counters or
+other columns change. Generation and expiry checks both use Laravel's Carbon
+application clock, so Laravel's test clock controls both operations. An OTP is
+valid through its exact expiry instant and is expired immediately after it.
+
 The package does not register routes, send messages, or implement a login flow.
 Deliver the returned token through the channel used by your application and
 keep routing, user lookup, guards, sessions, and responses in your app.
@@ -226,11 +236,25 @@ From a source checkout, install development dependencies and run the checks:
 composer install
 ./vendor/bin/pest
 ./vendor/bin/phpstan analyse
+./vendor/bin/pint --test
+composer validate --strict
+```
+
+The MariaDB integration suite is opt-in and requires an isolated database:
+
+```bash
+OTP_MARIADB_HOST=127.0.0.1 \
+OTP_MARIADB_PORT=3306 \
+OTP_MARIADB_DATABASE=laravel_otp_test \
+OTP_MARIADB_USERNAME=root \
+OTP_MARIADB_PASSWORD=secret \
+./vendor/bin/pest tests/Integration
 ```
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the 1.0.0 release notes and subsequent changes.
+See [CHANGELOG.md](CHANGELOG.md) for release notes and [UPGRADE-2.0.md](UPGRADE-2.0.md)
+for the 1.0.0 to 2.0.0 database upgrade.
 
 ## License
 

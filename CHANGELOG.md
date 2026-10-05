@@ -4,6 +4,32 @@ All notable changes to this package are documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-05
+
+### Fixed
+
+- Changed `otps.generated_at` from `TIMESTAMP` to `DATETIME` so MySQL and
+  MariaDB cannot add implicit `ON UPDATE CURRENT_TIMESTAMP` behaviour.
+- Made generation, validation-attempt, and expiration writes explicitly
+  preserve or set `generated_at` according to the OTP lifecycle.
+- Added a corrective migration for existing 1.0.0 installations that preserves
+  records and stored generation times.
+
+### Changed
+
+- Initial generation now stores `no_times_generated = 1` in the same insert;
+  regeneration increments the counter in the same update that sets the new
+  application-controlled generation time.
+- The corrective migration's `down()` is intentionally a no-op because
+  restoring `TIMESTAMP` could silently restore the database-managed update bug.
+
+### Compatibility
+
+- PHP `^8.4` and Laravel 12 or 13 remain supported.
+- Applications upgrading from 1.0.0 must run `php artisan migrate`. Existing
+  active OTPs whose timestamps were already shifted cannot be reconstructed;
+  see [UPGRADE-2.0.md](UPGRADE-2.0.md).
+
 ## [1.0.0] - 2026-10-03
 
 Initial stable release of `trianity/laravel-otp`.

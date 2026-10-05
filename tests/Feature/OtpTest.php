@@ -3,12 +3,17 @@
 namespace Trianity\Otp\Tests;
 
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Trianity\Otp\Facades\Otp;
 use Trianity\Otp\Models\Otp as OtpModel;
 use Trianity\Otp\Rules\OtpRule;
+
+afterEach(function () {
+    Carbon::setTestNow();
+});
 
 it('can generate and validate otp', function () {
     $identifier = Str::random(12);
@@ -129,6 +134,64 @@ it('does not delete regenerated otps based on their original creation time', fun
     Otp::generate(Str::random(13));
 
     expect(OtpModel::query()->whereKey($storedOtp->getKey())->exists())->toBeTrue();
+});
+
+it('changes generated at only when the otp is regenerated', function () {
+    $identifier = Str::random(12);
+    $firstGeneratedAt = Carbon::parse('2040-01-02 03:04:05', 'UTC');
+    Carbon::setTestNow($firstGeneratedAt);
+    Otp::generate($identifier);
+
+    Carbon::setTestNow($firstGeneratedAt->copy()->addMinutes(5));
+    Otp::validate($identifier, 'wrong-token');
+    OtpModel::query()->where('identifier', $identifier)->update([
+        'validity' => 45,
+    ]);
+
+    $afterUnrelatedUpdates = OtpModel::query()->where('identifier', $identifier)->firstOrFail();
+
+    expect($afterUnrelatedUpdates->generated_at->equalTo($firstGeneratedAt))->toBeTrue()
+        ->and($afterUnrelatedUpdates->no_times_attempted)->toBe(1);
+
+    $regeneratedAt = $firstGeneratedAt->copy()->addMinutes(10);
+    Carbon::setTestNow($regeneratedAt);
+    Otp::generate($identifier);
+    $afterRegeneration = OtpModel::query()->where('identifier', $identifier)->firstOrFail();
+
+    expect($afterRegeneration->generated_at->equalTo($regeneratedAt))->toBeTrue()
+        ->and($afterRegeneration->no_times_generated)->toBe(2);
+});
+
+it('accepts an otp at the expiry boundary and rejects it afterwards', function () {
+    $generatedAt = Carbon::parse('2040-02-03 04:05:06', 'UTC');
+    Carbon::setTestNow($generatedAt);
+    $atBoundary = Otp::generate('expiry-boundary');
+    $afterBoundary = Otp::generate('after-expiry-boundary');
+
+    Carbon::setTestNow($generatedAt->copy()->addMinutes((int) config('otp.validity')));
+
+    expect(Otp::validate('expiry-boundary', $atBoundary->token)->status)->toBeTrue();
+
+    Carbon::setTestNow($generatedAt->copy()->addMinutes((int) config('otp.validity'))->addSecond());
+
+    expect(Otp::validate('after-expiry-boundary', $afterBoundary->token)->status)->toBeFalse();
+});
+
+it('does not extend validity when validation attempts are made', function () {
+    $identifier = Str::random(12);
+    $generatedAt = Carbon::parse('2041-03-04 05:06:07', 'UTC');
+    Carbon::setTestNow($generatedAt);
+    $otp = Otp::generate($identifier);
+
+    Carbon::setTestNow($generatedAt->copy()->addMinutes(10));
+    Otp::validate($identifier, 'wrong-token');
+    Carbon::setTestNow($generatedAt->copy()->addMinutes((int) config('otp.validity'))->addSecond());
+
+    $validation = Otp::validate($identifier, $otp->token);
+    $storedOtp = OtpModel::query()->where('identifier', $identifier)->firstOrFail();
+
+    expect($validation->status)->toBeFalse()
+        ->and($storedOtp->generated_at->equalTo($generatedAt))->toBeTrue();
 });
 
 it('cant able to verify the otp once reach the maximum allowedAttempts', function () {

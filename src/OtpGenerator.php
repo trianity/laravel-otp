@@ -92,6 +92,7 @@ class OtpGenerator
                         'identifier' => $identifier,
                         'token' => Hash::make($token),
                         'validity' => $this->validity,
+                        'no_times_generated' => 1,
                         'generated_at' => Carbon::now(),
                     ]);
                 } catch (QueryException $exception) {
@@ -103,8 +104,6 @@ class OtpGenerator
 
                     throw $exception;
                 }
-
-                $otp->increment('no_times_generated');
 
                 return (object) [
                     'status' => true,
@@ -149,7 +148,7 @@ class OtpGenerator
                 ];
             }
 
-            $otp->increment('no_times_attempted');
+            $otp->incrementAttempts();
 
             if (! Hash::check($token, $otp->token)) {
                 return (object) [
@@ -159,8 +158,7 @@ class OtpGenerator
                 ];
             }
 
-            $otp->expired = true;
-            $otp->save();
+            $otp->markExpired();
 
             return (object) [
                 'status' => true,
@@ -207,14 +205,12 @@ class OtpGenerator
 
         $token = $this->useSameToken ? null : $this->createPin();
 
-        $otp->update([
+        $otp->increment('no_times_generated', 1, [
             'identifier' => $identifier,
             'token' => $token === null ? $otp->token : Hash::make($token),
             'validity' => $this->validity,
             'generated_at' => Carbon::now(),
         ]);
-
-        $otp->increment('no_times_generated');
 
         return (object) [
             'status' => true,

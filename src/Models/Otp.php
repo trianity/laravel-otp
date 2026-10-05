@@ -47,8 +47,7 @@ class Otp extends Model
             return false;
         }
 
-        $this->expired = true;
-        $this->save();
+        $this->markExpired();
 
         return true;
     }
@@ -56,5 +55,19 @@ class Otp extends Model
     public function expiredAt(): object
     {
         return $this->generated_at->addMinutes($this->validity);
+    }
+
+    public function incrementAttempts(): void
+    {
+        $this->increment('no_times_attempted', 1, [
+            'generated_at' => $this->generated_at,
+        ]);
+    }
+
+    public function markExpired(): void
+    {
+        $this->expired = true;
+        $this->original['generated_at'] = null;
+        $this->save();
     }
 }

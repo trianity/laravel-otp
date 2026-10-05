@@ -19,7 +19,7 @@ return new class extends Migration
             $table->boolean('expired')->default(false);
             $table->integer('no_times_generated')->default(0);
             $table->integer('no_times_attempted')->default(0);
-            $table->timestamp('generated_at');
+            $table->dateTime('generated_at');
             $table->timestamps();
         });
     }
